@@ -1,0 +1,60 @@
+name: Build Bridge CLI
+
+on:
+  push:
+    branches: ["main"]
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            output_name: bridge
+            asset_name: bridge-linux
+          - os: windows-latest
+            output_name: bridge.exe
+            asset_name: bridge-windows.exe
+          - os: macos-latest
+            output_name: bridge
+            asset_name: bridge-macos
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+
+      - name: Install Dependencies
+        run: dart pub get
+
+      - name: Compile Binary
+        shell: bash # <--- Windows Error မတက်အောင် ဒီကြောင်း ထည့်ထားပါတယ်
+        run: |
+          echo "Compiling for ${{ matrix.os }}..."
+          dart compile exe bin/bridge_cli.dart -o ${{ matrix.output_name }}
+
+          # Linux နဲ့ macOS အတွက် Executable permission ပေးခြင်း
+          if [ "${{ matrix.os }}" != "windows-latest" ]; then
+            chmod +x ${{ matrix.output_name }}
+          fi
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: ${{ matrix.output_name }}
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: ${{ matrix.output_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

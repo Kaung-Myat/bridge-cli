@@ -1,0 +1,47 @@
+# -----------------------
+# Dart & Flutter Defaults
+# -----------------------
+.dart_tool/
+.packages
+build/
+# pubspec.lock # Note: For CLI apps (binaries), keep pubspec.lock to ensure consistent versions for users.
+
+# -----------------------
+# Compiled Binaries 
+# -----------------------
+*.exe
+*.out
+*.jit
+*.a
+*.dylib
+*.so
+
+# Specific binaries you might build
+bin/bridge
+bridge
+
+# -----------------------
+# Node / JS (Future Proof)
+# -----------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# -----------------------
+# Bridge CLI Generated Files
+# -----------------------
+.ai-bridge.md
+
+
+bridge.yaml
+
+# -----------------------
+# IDE & System Files
+# -----------------------
+.DS_Store
+.idea/
+.vscode/
+*.swp
+thumbs.db
