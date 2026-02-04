@@ -18,7 +18,7 @@ Whether you are using **Flutter with Dart Frog** or **React with Node.js**, Brid
 
 ### Option 1: Download Pre-built Binaries (Recommended)
 
-You can find the latest binaries for **Linux**, **Windows**, and **macOS** on our **[Releases](https://github.com/Kaung-Myat/bridge-cli/releases/tag/v1.1.0)** page.
+You can find the latest binaries for **Linux**, **Windows**, and **macOS** on our **[Releases](https://github.com/Kaung-Myat/bridge-cli/releases/tag/v1.1.2)** page.
 
 #### 🐧 Linux (Ubuntu/Debian/Fedora)
 
