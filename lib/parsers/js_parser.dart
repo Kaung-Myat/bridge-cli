@@ -13,40 +13,47 @@ class JsParser implements CodeParser {
     // Find the project root directory to ensure TypeScript is available
     final projectRoot = await _findProjectRoot(file);
 
-    // Create the temporary script file in the project root directory
-    final tempFile = File(p.join(projectRoot, 'temp_bridge_js_ast_${DateTime.now().millisecondsSinceEpoch}.cjs'));
+    // Temp file name only (not full path yet)
+    final tempFileName = 'temp_bridge_js_ast_${DateTime.now().millisecondsSinceEpoch}.cjs';
+    // Full path for creating the file
+    final tempFile = File(p.join(projectRoot, tempFileName));
 
     try {
-      await tempFile.writeAsString(jsParserScript);
+      //flush: true is important on Windows to ensure file is ready
+      await tempFile.writeAsString(jsParserScript, flush: true);
 
-      // Run the node command from the project root directory
-      final result = await Process.run('node', [tempFile.path, file.path], workingDirectory: projectRoot);
+      // This avoids Windows absolute path issues in Node
+      final result = await Process.run('node', [tempFileName, file.path], workingDirectory: projectRoot);
 
+      // Clean up immediately
       if (await tempFile.exists()) {
-        await tempFile.delete();
+        try {
+          await tempFile.delete();
+        } catch (_) {}
       }
 
       if (result.exitCode != 0) {
-        print('JS Parser error: ${result.stderr}');
+        // Ignored node_modules or legitimate error?
+        // Don't clutter logs unless it's a real script crash
+        if (result.stderr.toString().contains('MODULE_NOT_FOUND') && result.stderr.toString().contains('typescript')) {
+          print('⚠️  Skipping ${p.basename(file.path)}: "typescript" package not found in $projectRoot. Run "npm install typescript"');
+          return null;
+        }
+        print('JS Parser error for ${file.path}: ${result.stderr}');
         return null;
       }
 
       final output = result.stdout.toString().trim();
-      if (output.isEmpty) {
-        print('JS Parser: Empty output');
-        return null;
-      }
+      if (output.isEmpty) return null;
 
       final List<dynamic> findings = jsonDecode(output);
       if (findings.isNotEmpty) {
         final cleanPath = p.normalize(file.absolute.path);
         final visitor = _JsStructureVisitor();
 
-        // Process the findings through the visitor to build the output
         for (var item in findings) {
           if (item is Map<String, dynamic>) {
             String type = item['type'] ?? 'unknown';
-
             switch (type) {
               case 'import':
                 visitor.visitImport(item['declaration'] ?? '');
@@ -71,13 +78,10 @@ class JsParser implements CodeParser {
         if (visitor.buffer.isNotEmpty) {
           return 'File: $cleanPath\n${visitor.buffer.toString()}';
         }
-      } else {
-        print('JS Parser: No findings in output');
       }
       return null;
-    } catch (e, stackTrace) {
-      print('JS Parser exception: $e');
-      print('Stack trace: $stackTrace');
+    } catch (e) {
+      // Clean up in case of crash
       if (await tempFile.exists()) {
         try {
           await tempFile.delete();
@@ -87,17 +91,15 @@ class JsParser implements CodeParser {
     }
   }
 
-  /// Find the project root directory that contains package.json
   Future<String> _findProjectRoot(File file) async {
     var currentDir = file.parent;
-    while (currentDir.path != '/' && currentDir.path != '.') {
+    while (currentDir.path != currentDir.parent.path) {
       final packageJson = File(p.join(currentDir.path, 'package.json'));
       if (await packageJson.exists()) {
         return currentDir.path;
       }
       currentDir = currentDir.parent;
     }
-    // If no package.json found, return the current working directory
     return Directory.current.path;
   }
 }
@@ -121,7 +123,6 @@ class _JsStructureVisitor {
           String params = method['params'] ?? '()';
           String returnType = method['returnType'] ?? '';
           String staticModifier = method['isStatic'] == true ? 'static ' : '';
-          // Only add return type annotation if it exists and is not 'void'
           String methodSignature = returnType.isNotEmpty && returnType != 'void' ? '${staticModifier}function $methodName$params: $returnType;' : '${staticModifier}function $methodName$params;';
           buffer.writeln('\n  $methodSignature');
         }
@@ -138,7 +139,6 @@ class _JsStructureVisitor {
         }
       }
     }
-
     buffer.writeln('\n}');
   }
 
@@ -146,7 +146,6 @@ class _JsStructureVisitor {
     String returnType = funcInfo['returnType'] ?? 'void';
     String name = funcInfo['name'] ?? '';
     String params = funcInfo['params'] ?? '()';
-    // Only add return type annotation if it exists and is not 'void'
     String functionSignature = returnType.isNotEmpty && returnType != 'void' ? '$name$params: $returnType;' : '$name$params;';
     buffer.writeln(functionSignature);
   }
@@ -154,7 +153,7 @@ class _JsStructureVisitor {
   void visitVariable(Map<String, dynamic> varInfo) {
     String type = varInfo['type'] ?? 'any';
     String name = varInfo['name'] ?? '';
-    String varType = varInfo['varType'] ?? 'var'; // let, const, var
+    String varType = varInfo['varType'] ?? 'var';
     buffer.writeln('$varType $name;');
   }
 
