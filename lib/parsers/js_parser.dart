@@ -10,20 +10,20 @@ class JsParser implements CodeParser {
 
   @override
   Future<String?> parseFile(File file) async {
-    // Find the project root directory to ensure TypeScript is available
     final projectRoot = await _findProjectRoot(file);
 
-    // Temp file name only (not full path yet)
     final tempFileName = 'temp_bridge_js_ast_${DateTime.now().millisecondsSinceEpoch}.cjs';
-    // Full path for creating the file
     final tempFile = File(p.join(projectRoot, tempFileName));
 
     try {
-      //flush: true is important on Windows to ensure file is ready
       await tempFile.writeAsString(jsParserScript, flush: true);
 
-      // This avoids Windows absolute path issues in Node
-      final result = await Process.run('node', [tempFileName, file.path], workingDirectory: projectRoot);
+      // use file.absolute.path so Node knows exactly where to look regardless of workingDirectory.
+      final result = await Process.run(
+        'node',
+        [tempFileName, file.absolute.path], // <--- HERE IS THE FIX
+        workingDirectory: projectRoot,
+      );
 
       // Clean up immediately
       if (await tempFile.exists()) {
@@ -33,8 +33,6 @@ class JsParser implements CodeParser {
       }
 
       if (result.exitCode != 0) {
-        // Ignored node_modules or legitimate error?
-        // Don't clutter logs unless it's a real script crash
         if (result.stderr.toString().contains('MODULE_NOT_FOUND') && result.stderr.toString().contains('typescript')) {
           print('⚠️  Skipping ${p.basename(file.path)}: "typescript" package not found in $projectRoot. Run "npm install typescript"');
           return null;
