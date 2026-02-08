@@ -11,17 +11,21 @@ class DartParser implements CodeParser {
   String get languageId => 'dart';
 
   @override
-  Future<String?> parseFile(File file) async {
+  Future<String?> parseFile(File file, {bool isFocused = false}) async {
     try {
       final content = await file.readAsString();
-      final result = parseString(content: content);
 
+      if (isFocused) {
+        return content;
+      }
+
+      final result = parseString(content: content);
       final visitor = _UniversalVisitor();
       result.unit.visitChildren(visitor);
 
       if (visitor.buffer.isNotEmpty) {
-        final cleanPath = p.normalize(file.absolute.path);
-        return 'File: $cleanPath\n${visitor.buffer.toString()}';
+        // final cleanPath = p.normalize(file.absolute.path);
+        return visitor.buffer.toString();
       }
     } catch (e) {
       return null;

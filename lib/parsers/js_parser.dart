@@ -9,21 +9,19 @@ class JsParser implements CodeParser {
   String get languageId => 'javascript';
 
   @override
-  Future<String?> parseFile(File file) async {
-    final projectRoot = await _findProjectRoot(file);
+  Future<String?> parseFile(File file, {bool isFocused = false}) async {
+    if (isFocused) {
+      return await file.readAsString();
+    }
 
+    final projectRoot = await _findProjectRoot(file);
     final tempFileName = 'temp_bridge_js_ast_${DateTime.now().millisecondsSinceEpoch}.cjs';
     final tempFile = File(p.join(projectRoot, tempFileName));
 
     try {
       await tempFile.writeAsString(jsParserScript, flush: true);
 
-      // use file.absolute.path so Node knows exactly where to look regardless of workingDirectory.
-      final result = await Process.run(
-        'node',
-        [tempFileName, file.absolute.path], // <--- HERE IS THE FIX
-        workingDirectory: projectRoot,
-      );
+      final result = await Process.run('node', [tempFileName, file.absolute.path], workingDirectory: projectRoot);
 
       // Clean up immediately
       if (await tempFile.exists()) {
@@ -46,7 +44,7 @@ class JsParser implements CodeParser {
 
       final List<dynamic> findings = jsonDecode(output);
       if (findings.isNotEmpty) {
-        final cleanPath = p.normalize(file.absolute.path);
+        // final cleanPath = p.normalize(file.absolute.path);
         final visitor = _JsStructureVisitor();
 
         for (var item in findings) {
@@ -74,7 +72,7 @@ class JsParser implements CodeParser {
         }
 
         if (visitor.buffer.isNotEmpty) {
-          return 'File: $cleanPath\n${visitor.buffer.toString()}';
+          return visitor.buffer.toString();
         }
       }
       return null;

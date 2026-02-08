@@ -10,8 +10,12 @@ import 'package:bridge_cli/generator/context_generator.dart';
 void main(List<String> arguments) async {
   final parser = ArgParser();
   parser.addCommand('init');
-  parser.addCommand('build');
   parser.addCommand('watch');
+  parser.addCommand('add');
+
+  var buildCommand = parser.addCommand("build");
+  buildCommand.addOption('focus', abbr: 'f', help: 'Path to the specific file you want full context for.');
+
   parser.addFlag('help', abbr: 'h', negatable: false);
 
   ArgResults argResults;
@@ -34,10 +38,14 @@ void main(List<String> arguments) async {
       await _handleInitCommand(command!.rest);
       break;
     case 'build':
-      await _handleBuildCommand();
+      final focusPath = command?['focus'];
+      await _handleBuildCommand(focusPath);
       break;
     case 'watch':
       await _handleWatchCommand();
+      break;
+    case 'add':
+      await _handleAddCommand(command!.rest);
       break;
     default:
       _printUsage();
@@ -83,9 +91,24 @@ Future<void> _handleInitCommand(List<String> paths) async {
   }
 }
 
-Future<void> _handleBuildCommand() async {
+Future<void> _handleAddCommand(List<String> args) async {
+  if (args.isEmpty) {
+    print('\x1B[31m❌ Please provide a path. Usage: bridge add <path>\x1B[0m');
+    exit(1);
+  }
+
+  final targetPath = args.first;
+  final configManager = ConfigManager();
+
+  print('\x1B[36m🔗 Linking project: $targetPath...\x1B[0m');
+  await configManager.addProject(targetPath);
+}
+
+Future<void> _handleBuildCommand(String? focusPath) async {
   final generator = ContextGenerator();
-  await generator.generateContext();
+  print(focusPath != null ? '\x1B[36m🎯 Focus Mode Active: Full code for "$focusPath"\x1B[0m' : '\x1B[36m🦴 Skeleton Mode: Generating lightweight context...\x1B[0m');
+
+  await generator.generateContext(focusPath: focusPath);
 }
 
 Future<void> _handleWatchCommand() async {
@@ -96,10 +119,12 @@ Future<void> _handleWatchCommand() async {
 }
 
 void _printUsage() {
-  print('Bridge CLI Tool v0.0.1');
+  print('Bridge CLI Tool v1.2.0');
   print('Usage: bridge <command>');
   print('\nCommands:');
-  print('  init    Scan and create bridge.yaml config.');
-  print('  build   Generate .ai-bridge.md once.');
-  print('  watch   Live sync .ai-bridge.md on file changes.');
+  print('  init           Scan and create bridge.yaml');
+  print('  add <path>     Link external project');
+  print('  build          Generate .ai-bridge.md (Skeleton Mode by default)');
+  print('  build -f <path> Focus on a specific file (Full Code Mode)');
+  print('  watch          Live sync');
 }

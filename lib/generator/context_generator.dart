@@ -8,7 +8,7 @@ import 'package:yaml/yaml.dart';
 
 class ContextGenerator {
   final Map<String, CodeParser> _parsers = {'dart': DartParser(), 'node': JsParser()};
-  Future<void> generateContext() async {
+  Future<void> generateContext({String? focusPath}) async {
     final configFile = File(p.join(Directory.current.path, 'bridge.yaml'));
     if (!configFile.existsSync()) {
       print('\x1B[31m❌ bridge.yaml not found. Please run "bridge init" first.\x1B[0m');
@@ -27,10 +27,7 @@ class ContextGenerator {
           final dir = Directory(project['path']);
           final type = project['type'];
           if (!dir.existsSync()) return Stream.empty();
-          return dir
-              .list(recursive: true)
-              .whereType<File>()
-              .map((file) => (file: file, type: type as String));
+          return dir.list(recursive: true).whereType<File>().map((file) => (file: file, type: type as String));
         })
         .where((data) => _shouldParse(data.file.path, data.type))
         .asyncMap((data) async {
